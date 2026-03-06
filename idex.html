@@ -10,7 +10,7 @@ input,textarea,button{margin:5px 0;padding:5px;}
 button:disabled{opacity:0.5;cursor:not-allowed;}
 .memo{background:white;border-radius:8px;padding:10px;margin:10px 0;box-shadow:0 3px 6px rgba(0,0,0,0.2);}
 .memoTitle{font-weight:bold;font-size:18px;margin-bottom:5px;}
-@media (max-width:600px){input,textarea,button{width:100%;}}
+@media (max-width:600px){input,textarea,select,button{width:100%;}}
 </style>
 </head>
 <body>
@@ -39,15 +39,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, setPersistence, browserLocalPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// 🔹 Firebase 設定
+// 🔹 Firebase 設定（自分のプロジェクト情報に置き換え）
 const firebaseConfig = {
-  apiKey: "AIzaSyBPl_QKfAZM8TmWEtbi4rXb4ZasdM9WOQg",
-  authDomain: "hokutoshitisei.firebaseapp.com",
-  projectId: "hokutoshitisei",
-  storageBucket: "hokutoshitisei.firebasestorage.app",
-  messagingSenderId: "16257405689",
-  appId: "1:16257405689:web:17e7b92362c56d82b48828",
-  measurementId: "G-LFGEC7VKN3"
+  apiKey: "自分のAPIキー",
+  authDomain: "自分のプロジェクトID.firebaseapp.com",
+  projectId: "自分のプロジェクトID",
+  storageBucket: "自分のプロジェクトID.appspot.com",
+  messagingSenderId: "自分の送信ID",
+  appId: "自分のアプリID",
+  measurementId: "G-XXXX"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -94,7 +94,6 @@ onSnapshot(collection(db,"notes"), snap=>{
   snap.forEach(d=>{
     const data = d.data();
     const id = d.id;
-    // 🔹 アクセス制御: 作成者 or 招待ユーザーのみ
     if(data.ownerUid!==uid && !data.invitedUids.includes(uid)) return;
 
     const box = document.createElement("div"); box.className="memo";
@@ -102,7 +101,6 @@ onSnapshot(collection(db,"notes"), snap=>{
     const content = document.createElement("div"); content.textContent=data.content;
     box.appendChild(title); box.appendChild(content);
 
-    // 🔹 編集・削除は作成者のみ
     if(data.ownerUid===uid){
       const editBtn = document.createElement("button"); editBtn.textContent="編集";
       editBtn.onclick=async()=>{
