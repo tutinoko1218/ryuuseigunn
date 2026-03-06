@@ -10,7 +10,8 @@ input,textarea,button{margin:5px 0;padding:5px;}
 button:disabled{opacity:0.5;cursor:not-allowed;}
 .memo{background:white;border-radius:8px;padding:10px;margin:10px 0;box-shadow:0 3px 6px rgba(0,0,0,0.2);}
 .memoTitle{font-weight:bold;font-size:18px;margin-bottom:5px;}
-@media (max-width:600px){input,textarea,select,button{width:100%;}}
+.comment{margin-left:20px;padding:3px;background:#f0f0f0;border-radius:5px;}
+@media (max-width:600px){input,textarea,button,select{width:100%;}}
 </style>
 </head>
 <body>
@@ -36,21 +37,23 @@ button:disabled{opacity:0.5;cursor:not-allowed;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, setPersistence, browserLocalPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 
-// 🔹 Firebase 設定（自分のプロジェクト情報に置き換え）
+// 🔹 Firebase 設定（あなたの設定）
 const firebaseConfig = {
-  apiKey: "自分のAPIキー",
-  authDomain: "自分のプロジェクトID.firebaseapp.com",
-  projectId: "自分のプロジェクトID",
-  storageBucket: "自分のプロジェクトID.appspot.com",
-  messagingSenderId: "自分の送信ID",
-  appId: "自分のアプリID",
-  measurementId: "G-XXXX"
+  apiKey: "AIzaSyCxFJMFAYlnhjO5zvZY017Twbua-FIydaA",
+  authDomain: "nova-dd54e.firebaseapp.com",
+  projectId: "nova-dd54e",
+  storageBucket: "nova-dd54e.firebasestorage.app",
+  messagingSenderId: "984157274477",
+  appId: "1:984157274477:web:4624013beb95775ccc5a64",
+  measurementId: "G-MYF40R43LT"
 };
 
 const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
@@ -87,6 +90,13 @@ saveMemo.onclick=async()=>{
   document.getElementById("inviteUid").value="";
 };
 
+// 🔹 コメント作成
+async function addComment(noteId, type, content){
+  await addDoc(collection(db,"comments"),{
+    noteId, userUid: uid, type, content, createdAt: new Date()
+  });
+}
+
 // 🔹 メモ一覧
 onSnapshot(collection(db,"notes"), snap=>{
   const div = document.getElementById("memos");
@@ -101,6 +111,7 @@ onSnapshot(collection(db,"notes"), snap=>{
     const content = document.createElement("div"); content.textContent=data.content;
     box.appendChild(title); box.appendChild(content);
 
+    // 編集・削除は作成者のみ
     if(data.ownerUid===uid){
       const editBtn = document.createElement("button"); editBtn.textContent="編集";
       editBtn.onclick=async()=>{
@@ -112,6 +123,30 @@ onSnapshot(collection(db,"notes"), snap=>{
       delBtn.onclick=async()=>{ if(confirm("削除しますか？")) await deleteDoc(doc(db,"notes",id)); }
       box.appendChild(editBtn); box.appendChild(delBtn);
     }
+
+    // チェックボタン
+    const checkBtn = document.createElement("button"); checkBtn.textContent="作業済みチェック";
+    checkBtn.onclick=()=>addComment(id,"check","完了");
+    box.appendChild(checkBtn);
+
+    // コメント入力
+    const commentInput = document.createElement("input"); commentInput.placeholder="コメント";
+    const commentBtn = document.createElement("button"); commentBtn.textContent="追加";
+    commentBtn.onclick=()=>{ if(commentInput.value) addComment(id,"comment",commentInput.value); commentInput.value=""; }
+    box.appendChild(commentInput); box.appendChild(commentBtn);
+
+    // コメント表示
+    const q = query(collection(db,"comments"), where("noteId","==",id), orderBy("createdAt"));
+    onSnapshot(q, snapC=>{
+      const oldComments = box.querySelectorAll(".comment");
+      oldComments.forEach(c=>c.remove());
+      snapC.forEach(c=>{
+        const com = document.createElement("div"); com.className="comment";
+        const comData = c.data();
+        com.textContent = `${comData.type==="check"?"✅":"💬"} (${comData.userUid}): ${comData.content}`;
+        box.appendChild(com);
+      });
+    });
 
     div.appendChild(box);
   });
