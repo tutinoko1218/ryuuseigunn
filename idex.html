@@ -35,13 +35,14 @@ button:disabled{opacity:0.5;cursor:not-allowed;}
 <div id="memos"></div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, setPersistence, browserLocalPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+<!-- Firebase CDN -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js"></script>
 
-// 🔹 Firebase 設定（あなたの設定）
+<script>
+// 🔹 Firebase 設定
 const firebaseConfig = {
   apiKey: "AIzaSyCxFJMFAYlnhjO5zvZY017Twbua-FIydaA",
   authDomain: "nova-dd54e.firebaseapp.com",
@@ -52,16 +53,16 @@ const firebaseConfig = {
   measurementId: "G-MYF40R43LT"
 };
 
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const db = getFirestore(app);
-const auth = getAuth(app);
+firebase.initializeApp(firebaseConfig);
+firebase.analytics();
+const db = firebase.firestore();
+const auth = firebase.auth();
 
 let uid = null;
 
 // 🔹 認証
-setPersistence(auth, browserLocalPersistence)
-.then(()=>signInAnonymously(auth))
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+.then(()=>auth.signInAnonymously())
 .then(userCredential => { uid = userCredential.user.uid; console.log("認証完了 uid:", uid); })
 .catch(err=>alert("認証エラー: "+err.message));
 
@@ -82,7 +83,7 @@ saveMemo.onclick=async()=>{
   const content = document.getElementById("memoContent").value;
   const invitedUids = document.getElementById("inviteUid").value.split(",").map(u=>u.trim()).filter(u=>u);
   if(!title || !content) return alert("タイトルと本文を入力してください");
-  await addDoc(collection(db,"notes"),{
+  await db.collection("notes").add({
     title, content, ownerUid:uid, invitedUids, createdAt:new Date(), updatedAt:new Date()
   });
   document.getElementById("memoTitle").value="";
@@ -92,13 +93,13 @@ saveMemo.onclick=async()=>{
 
 // 🔹 コメント作成
 async function addComment(noteId, type, content){
-  await addDoc(collection(db,"comments"),{
+  await db.collection("comments").add({
     noteId, userUid: uid, type, content, createdAt: new Date()
   });
 }
 
 // 🔹 メモ一覧
-onSnapshot(collection(db,"notes"), snap=>{
+db.collection("notes").onSnapshot(snap=>{
   const div = document.getElementById("memos");
   div.innerHTML="";
   snap.forEach(d=>{
@@ -117,10 +118,10 @@ onSnapshot(collection(db,"notes"), snap=>{
       editBtn.onclick=async()=>{
         const newTitle = prompt("タイトル",data.title);
         const newContent = prompt("本文",data.content);
-        if(newTitle && newContent) await updateDoc(doc(db,"notes",id),{title:newTitle, content:newContent, updatedAt:new Date()});
+        if(newTitle && newContent) await db.collection("notes").doc(id).update({title:newTitle, content:newContent, updatedAt:new Date()});
       }
       const delBtn = document.createElement("button"); delBtn.textContent="削除";
-      delBtn.onclick=async()=>{ if(confirm("削除しますか？")) await deleteDoc(doc(db,"notes",id)); }
+      delBtn.onclick=async()=>{ if(confirm("削除しますか？")) await db.collection("notes").doc(id).delete(); }
       box.appendChild(editBtn); box.appendChild(delBtn);
     }
 
@@ -136,8 +137,8 @@ onSnapshot(collection(db,"notes"), snap=>{
     box.appendChild(commentInput); box.appendChild(commentBtn);
 
     // コメント表示
-    const q = query(collection(db,"comments"), where("noteId","==",id), orderBy("createdAt"));
-    onSnapshot(q, snapC=>{
+    const q = db.collection("comments").where("noteId","==",id).orderBy("createdAt");
+    q.onSnapshot(snapC=>{
       const oldComments = box.querySelectorAll(".comment");
       oldComments.forEach(c=>c.remove());
       snapC.forEach(c=>{
