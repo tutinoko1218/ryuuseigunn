@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>招待制共同メモ</title>
+<style>
+body{background:#FFD580;font-family:sans-serif;padding:20px;margin:0;}
+h1,h2{margin-top:20px;}
+input,textarea,select,button{margin:5px 0;padding:5px;}
+button:disabled{opacity:0.5;cursor:not-allowed;}
+.memo{background:white;border-radius:8px;padding:10px;margin:10px 0;box-shadow:0 3px 6px rgba(0,0,0,0.2);}
+.memoTitle{font-weight:bold;font-size:18px;margin-bottom:5px;}
+.comment{margin-left:10px;padding:5px;background:#FFF3C4;border-radius:5px;}
+@media (max-width:600px){input,textarea,select,button{width:100%;}}
+</style>
+</head>
+<body>
+
+<h1>招待制共同メモ</h1>
+
+<h2>ホーム</h2>
+<button id="createBtn">メモを作る</button>
+<button id="listBtn">メモ一覧</button>
+
+<div id="createForm" style="display:none;">
+<h2>メモ作成</h2>
+<input id="memoTitle" placeholder="タイトル"><br>
+<textarea id="memoContent" placeholder="本文"></textarea><br>
+<input id="inviteUid" placeholder="招待するUID（カンマ区切り）"><br>
+<button id="saveMemo">保存</button>
+</div>
+
+<div id="memoList" style="display:none;">
+<h2>メモ一覧</h2>
+<div id="memos"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, setPersistence, browserLocalPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// 🔹 Firebase 設定
+const firebaseConfig = {
+  apiKey: "AIzaSyBPl_QKfAZM8TmWEtbi4rXb4ZasdM9WOQg",
+  authDomain: "hokutoshitisei.firebaseapp.com",
+  projectId: "hokutoshitisei",
+  storageBucket: "hokutoshitisei.firebasestorage.app",
+  messagingSenderId: "16257405689",
+  appId: "1:16257405689:web:17e7b92362c56d82b48828",
+  measurementId: "G-LFGEC7VKN3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+let uid = null;
+
+// 🔹 認証
+setPersistence(auth, browserLocalPersistence)
+.then(()=>signInAnonymously(auth))
+.then(userCredential => { uid = userCredential.user.uid; console.log("認証完了 uid:", uid); })
+.catch(err=>alert("認証エラー: "+err.message));
+
+// 🔹 UI
+const createBtn = document.getElementById("createBtn");
+const listBtn = document.getElementById("listBtn");
+const createForm = document.getElementById("createForm");
+const memoList = document.getElementById("memoList");
+const saveMemo = document.getElementById("saveMemo");
+
+createBtn.onclick=()=>{ createForm.style.display="block"; memoList.style.display="none"; };
+listBtn.onclick=()=>{ memoList.style.display="block"; createForm.style.display="none"; };
+
+// 🔹 メモ作成
+saveMemo.onclick=async()=>{
+  if(!uid) return alert("認証中…少し待ってください");
+  const title = document.getElementById("memoTitle").value;
+  const content = document.getElementById("memoContent").value;
+  const invitedUids = document.getElementById("inviteUid").value.split(",").map(u=>u.trim()).filter(u=>u);
+  if(!title || !content) return alert("タイトルと本文を入力してください");
+  await addDoc(collection(db,"notes"),{
+    title, content, ownerUid:uid, invitedUids, createdAt:new Date(), updatedAt:new Date()
+  });
+  document.getElementById("memoTitle").value="";
+  document.getElementById("memoContent").value="";
+  document.getElementById("inviteUid").value="";
+};
+
+// 🔹 メモ一覧
+onSnapshot(collection(db,"notes"), snap=>{
+  const div = document.getElementById("memos");
+  div.innerHTML="";
+  snap.forEach(d=>{
+    const data = d.data();
+    const id = d.id;
+    // 🔹 アクセス制御: 作成者 or 招待ユーザーのみ
+    if(data.ownerUid!==uid && !data.invitedUids.includes(uid)) return;
+
+    const box = document.createElement("div"); box.className="memo";
+    const title = document.createElement("div"); title.className="memoTitle"; title.textContent=data.title;
+    const content = document.createElement("div"); content.textContent=data.content;
+    box.appendChild(title); box.appendChild(content);
+
+    // 🔹 編集・削除は作成者のみ
+    if(data.ownerUid===uid){
+      const editBtn = document.createElement("button"); editBtn.textContent="編集";
+      editBtn.onclick=async()=>{
+        const newTitle = prompt("タイトル",data.title);
+        const newContent = prompt("本文",data.content);
+        if(newTitle && newContent) await updateDoc(doc(db,"notes",id),{title:newTitle, content:newContent, updatedAt:new Date()});
+      }
+      const delBtn = document.createElement("button"); delBtn.textContent="削除";
+      delBtn.onclick=async()=>{ if(confirm("削除しますか？")) await deleteDoc(doc(db,"notes",id)); }
+      box.appendChild(editBtn); box.appendChild(delBtn);
+    }
+
+    div.appendChild(box);
+  });
+});
+</script>
+</body>
+</html>
